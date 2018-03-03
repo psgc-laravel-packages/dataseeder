@@ -1,5 +1,5 @@
 <?php
-namespace PsgcComposerPackages\DataSeeder;
+namespace PsgcLaravelPackages\DataSeeder;
 
 abstract class BaseSeeder {
 
