@@ -1,0 +1,21 @@
+{
+    "name": "psgc-composer-packages/dataseeder",
+    "description": "Access control for middleware use",
+    "keywords": ["laravel", "utils"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "psgc-composer-packages",
+            "email": "peter@peltronic.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "PsgcComposerPackages\\DataSeeder\\": "src/"
+        }
+    },
+    "require": {
+        "illuminate/support": "~5"
+    }
+}
+
