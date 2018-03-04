@@ -10,22 +10,107 @@ abstract class BaseSeeder {
 
     protected $_SEED_TABLE = null;
 
-    public function __construct($seedData,$isRawPhpArray=1)
+    protected $_seedconfigs = [];
+
+    public function __construct($seedconfigs, $seedData)
     {
-        $this->_seedArray = [];
+        $this->_seedconfigs = $seedconfigs;
+
         $this->_seedRecords = [];
         $this->_stats = ['total'=>0,'new'=>0,'skipped'=>0,'errors'=>0];
-        if ($isRawPhpArray) {
-            $this->_seedData = $seedData;
-        } else {
-            // json-encoded
-            $this->_seedData = json_decode($seedData,1);
-        }
-        $this->loadSeedArray(); 
+        $this->_seedData = json_decode($seedData,1); // json-encoded
+
+        $this->_seedArray = []; // data to insert to DB
+        foreach ($this->_seedData[$this->_SEED_TABLE] as $iter => $_seed) {
+            $this->_seedArray[$iter] = $this->parseSeed($_seed);
+        } 
+
     }
 
-    /* Public API */
-    abstract public        function writeSeeds($skipDupicates); // Write all seeds to DB
+
+    //abstract protected  function parseSeed($seed); // Parse and handle any special fields
+
+    // Parse any special fields:
+    //   '#' : indicates a comment
+    //   '@' : indicates 'belongsTo' that does not use raw FK id (for instance the relation's slug instead of PKID)
+    //   '...' : indicates parent relation (key), or a key that needs special processing
+    //   '+' : indicates child relation(s) (key)
+    //   '%' : indicates a sepcial value (eg %inherit)
+    // Parse and handle any special fields
+// HERE MONDAY %TODO
+    protected function parseSeed($seed)
+    {
+        foreach ($seed as $key => $value) {
+
+
+            $prefix = substr($key,0,1);
+
+            switch ($prefix) {
+
+                case '#': // comment
+                    $configKey = substr($key, 1); // remove prefix to get raw key
+                    unset($seed[$key]);
+                    continue; // skip comments
+
+                case '@': // relation alias
+                    $configKey = substr($key, 1); // remove prefix to get raw key
+                    if ( array_key_exists($configKey, $this->_seedconfigs) ) {
+                        $rule = $this->_seedconfigs[$configKey];
+                        if ( array_key_exists('belongs_to', $rule) ) {
+                            $belongsTo = $rule['belongs_to'];
+                            //$record = \App\Models\User::where('username',$seed['@fielder'])->firstOrFail();
+                            $record = DB::table($belongsTo['table'])->where($belongsTo['keyed_by'], $seed[$key])->firstOrFail();
+                            $seed[$belongsTo['fkid']] = $record->id;
+                        }
+                    }
+                    continue;
+
+                case '*': // lookup via method
+                    $configKey = substr($key, 1); // remove prefix to get raw key
+                    if ( array_key_exists($configKey, $this->_seedconfigs) ) {
+                        $rule = $this->_seedconfigs[$configKey];
+                        if ( array_key_exists('resolved_by', $rule) ) {
+                            //'astate'=>['resolved_by'=>'\App\Models\Enum\Application\AstateEnum::findKeyBySlug'],
+                            $fResolvedBy = $rule['resolved_by'];
+                            $seed[$configKey] = $fResolvedBy($value); // function call (%FIXME: use map?)
+                            //$seed['service_category'] = AAservicecategoryEnum::findKeyBySlug($value);
+                        }
+                    }
+                    continue;
+
+                case '%':
+                    $configKey = substr($key, 1); // remove prefix to get raw key
+                    // TBD
+                    continue;
+
+                case '+':
+                    $configKey = substr($key, 1); // remove prefix to get raw key
+                    // TBD
+                    continue;
+
+                default:
+                    $configKey = $key; // no prefix
+                    $seed[$configKey] = $value; // direct assignment
+
+            } // switch()
+
+        } // foreach ($seed)
+
+        return $seed;
+
+
+    } // parseSeed()
+
+    public function writeSeeds($skipDuplicates=1)
+    {
+        foreach ($this->_seedArray as $iter=> $seed) {
+            $pkid = DB::table($this->_SEED_TABLE)->insertGetId($this->_seedArray);
+            $record = DB::table($this->_SEED_TABLE)->find($pkid);
+            $this->_seedRecords[] = $record;
+            //$this->updateStats($record);
+        }
+
+    } // writeSeeds()
 
     // Read seeds *from* DB 
     // If any 'has many' relations need to be tacked on, override this method in child class
@@ -72,37 +157,10 @@ abstract class BaseSeeder {
         }
     }
 
-    // Is the key a comment?
-    public function isComment($key)
-    {
-        $is = ( '#' == substr($key,0,1) );
-        return $is;
-    }
 
     /* Protected Methods */
 
-    // sets _seedArray
-    protected function loadSeedArray()
-    {
-        /*
-        if ( empty($this->_seedData) ) {
-            return; // skip, nothing to do...
-        }
-         */
-        $this->_seedArray = []; // data to insert to DB
-        foreach ($this->_seedData[$this->_SEED_TABLE] as $iter => $_seed) {
-            $this->_seedArray[$iter] = $this->parseSeed($_seed);
-        } // foreach ($seedData...) : loop through list of agencies in seed data
-        return $this; // chain-able %TODO %NOTE : good interview question
-    } // loadSeedArray()
-
     
-    // Parse any special fields:
-    //   '#' : indicates a comment
-    //   '@' : indicates parent relation (key), or a key that needs special processing
-    //   '+' : indicates child relation(s) (key)
-    //   '%' : indicates a sepcial value (eg %inherit)
-    abstract protected        function parseSeed($seed); // Parse and handle any special fields
 
     //abstract protected static function seedToArray(); // convert DB record format to 'array'
 

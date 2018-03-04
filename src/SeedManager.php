@@ -13,13 +13,15 @@ class SeedManager {
     protected $_isDebug = 0;
 
     protected $_timestamp = null;
-    protected $_configs = [];
+    protected $_meta = [];
+    protected $_seedconfigs = [];
 
     const TRUNCATE_BLACKLIST = ['migrations', 'importfiles', 'importqueue', ];
 
-    public function __construct($configs, $isDebug)
+    public function __construct($seedconfigs, $meta, $isDebug)
     {
-        $this->_configs = $configs;
+        $this->_meta = $meta;
+        $this->_seedconfigs = $seedconfigs;
         $this->_isDebug = $isDebug;
         $this->_timestamp = date('Y-m-d H:i:s');
         //dd('SeedMangaer::__construct()',$seedsIn,$this->_queuedSeeds);
@@ -58,6 +60,10 @@ class SeedManager {
                 // there may be multiple seeds with same priority...
                 foreach ($seedtables as $st ) {
 
+                    $seeder = new BaseSeeder( $this->_seedconfigs, \File::get(self::$_seedPath.'accounts.json') );
+                    $seeder->writeSeeds();
+
+                        /*
                     switch ($s) {
 
                         case 'accounts':
@@ -89,6 +95,7 @@ class SeedManager {
                             //$usersSeeder->isDebug();
                             break;
                         } // switch()
+                         */
                 } // foreach()
             } // foreach()
 
@@ -107,9 +114,9 @@ class SeedManager {
     {
         // check that server is whitelisted for truncate...
         $can = false; // default
-        if ( array_key_exists('whitelisted', $this->_configs) ) {
+        if ( array_key_exists('whitelisted_servers', $this->_meta) ) {
             $serverID = env('SERVER_ID', null);
-            $can = isset($serverID) && in_array($serverID,$this->_configs['whitelisted']);
+            $can = isset($serverID) && in_array($serverID,$this->_meta['whitelisted_servers']);
         }
         return $can;
     }
